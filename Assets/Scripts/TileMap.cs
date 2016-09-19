@@ -232,8 +232,8 @@ public class TileMap : MonoBehaviour {
 
     private void HighlightStartAndGoal(Tile start, Color startColor, Tile goal, Color goalColor)
     {
-        start.GetComponent<Renderer>().material.color = startColor;
-        goal.GetComponent<Renderer>().material.color = goalColor;
+        start.FindHighestTile().GetComponent<Renderer>().material.color = startColor;
+        goal.FindHighestTile().GetComponent<Renderer>().material.color = goalColor;
     }
     /// <summary>
     /// Use linerenderer to draw the path from start to finish.

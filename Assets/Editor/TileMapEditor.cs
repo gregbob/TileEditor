@@ -21,6 +21,7 @@ public class TileMapEditor : Editor {
 
     private Texture paintTexture;
     private GameObject objToPlace;
+    private GameObject objToPlacePreview;
     private bool visitableOnPlace = true;
     private EditorState state = EditorState.ADD_REMOVE;
     private bool[] stateToggles = new bool[6]; // Number of states
@@ -39,19 +40,51 @@ public class TileMapEditor : Editor {
         
     }
 
+    void OnDisable()
+    {
+        DestroyImmediate(objToPlacePreview);
+    }
+
+    private Tile GetTile(GameObject obj)
+    {
+        Tile tile = null;
+        tile = obj.GetComponent<Tile>();
+        if (tile != null)
+            return tile;
+        tile = obj.GetComponentInParent<Tile>();
+        if (tile != null)
+            return tile;
+
+        return null;
+    }
+
     void OnSceneGUI()
     {
        
         Event e = Event.current;
         // Get controlID to prevent clicking to deselect the selected object in hierarchy
+
         HandleUtility.AddDefaultControl(GUIUtility.GetControlID(GetHashCode(), FocusType.Passive));
 
-            
-
-        if (e.type == EventType.MouseDrag || e.type == EventType.MouseDown) 
+        if (state == EditorState.PLACE_OBJECT)
         {
-            var ray = HandleUtility.GUIPointToWorldRay(new Vector3(e.mousePosition.x, e.mousePosition.y, Camera.main.transform.position.z * -1));
             RaycastHit hit;
+            if (Physics.Raycast(HandleUtility.GUIPointToWorldRay(e.mousePosition), out hit))
+            {
+                
+                if (objToPlacePreview != null) 
+                    objToPlacePreview.transform.position = new Vector3(hit.collider.transform.position.x, hit.collider.transform.position.y + 1, hit.collider.transform.position.z);
+            }
+        }
+        
+
+        //Debug.Log(HandleUtility.GUIPointToWorldRay(e.mousePosition));
+        if (e.type == EventType.MouseDrag || e.type == EventType.MouseDown)
+        {
+            RaycastHit hit;
+
+            var ray = HandleUtility.GUIPointToWorldRay(new Vector3(e.mousePosition.x, e.mousePosition.y, Camera.main.transform.position.z * -1));
+            
             if (Physics.Raycast(ray, out hit))
             {
 
@@ -68,7 +101,7 @@ public class TileMapEditor : Editor {
             }
             e.Use();
         }
-        if (e.type == EventType.KeyDown)
+        else if (e.type == EventType.KeyDown )
         {
             if (e.keyCode == KeyCode.I)
             {
@@ -94,7 +127,7 @@ public class TileMapEditor : Editor {
                 ChangeState(EditorState.PLACE_OBJECT, state);
             }
             e.Use();
-        }
+        } 
 
         // Forces inspector to redraw. Useful for situations where inspector is
         // modified outside of OnInspectorGUI
@@ -232,7 +265,8 @@ public class TileMapEditor : Editor {
         GUILayout.FlexibleSpace();
 
 
-
+        if (GUI.changed)
+            EditorUtility.SetDirty(target);
 
 
         // Check to see if toggle value changed
@@ -272,6 +306,14 @@ public class TileMapEditor : Editor {
             if (GUI.Button(new Rect(count * textureIconSize + position.x, row * textureIconSize + position.y + boxPadding, textureIconSize, textureIconSize), AssetPreview.GetAssetPreview(gameObjs[i]), g))
             {
                 objToPlace = gameObjs[i];
+                if (objToPlacePreview != null)                
+                    DestroyImmediate(objToPlacePreview);                   
+
+                objToPlacePreview = Instantiate(objToPlace);
+                objToPlacePreview.GetComponent<Collider>().enabled = false;
+                TileMap tm = target as TileMap;
+                objToPlacePreview.transform.SetParent(tm.transform);
+
             }
             GUI.TextArea(new Rect(count * textureIconSize + position.x, row * textureIconSize + position.y + boxPadding, textureIconSize, textHeight), gameObjs[i].name);
 
@@ -450,7 +492,14 @@ public class TileMapEditor : Editor {
         }
         else if (state == EditorState.TEXTURE)
         {
-            ChangeTexture(tile.GetComponent<Renderer>(), paintTexture);
+            if (e.control)
+            {
+                paintTexture = tile.GetComponent<Renderer>().sharedMaterial.mainTexture;
+            } else
+            {
+                ChangeTexture(tile.GetComponent<Renderer>(), paintTexture);
+
+            }
         } else if (state == EditorState.ROTATE)
         {
             tile.transform.Rotate(tile.transform.up, rotateBy);
