@@ -31,13 +31,14 @@ public class TileMapEditor : Editor {
     private GameObject[] allPrefabs;
 
 
+    
     void OnEnable()
     {  
         stateToggles[(int)EditorState.ADD_REMOVE] = true;
 
         allTextures = FindAllTextures();
         allPrefabs = FindAllPrefabs();
-        
+
     }
 
     void OnDisable()
@@ -58,27 +59,146 @@ public class TileMapEditor : Editor {
         return null;
     }
 
-    void OnSceneGUI()
+    public void OnMouseMove(Event e)
     {
-       
-        Event e = Event.current;
-        // Get controlID to prevent clicking to deselect the selected object in hierarchy
-
-        HandleUtility.AddDefaultControl(GUIUtility.GetControlID(GetHashCode(), FocusType.Passive));
-
         if (state == EditorState.PLACE_OBJECT)
         {
             RaycastHit hit;
             if (Physics.Raycast(HandleUtility.GUIPointToWorldRay(e.mousePosition), out hit))
             {
-                
-                if (objToPlacePreview != null) 
+
+                if (objToPlacePreview != null)
                     objToPlacePreview.transform.position = new Vector3(hit.collider.transform.position.x, hit.collider.transform.position.y + 1, hit.collider.transform.position.z);
             }
         }
-        
+    }
 
-        //Debug.Log(HandleUtility.GUIPointToWorldRay(e.mousePosition));
+    // Currently assumes we are clicking on a tile 100% of the time. Seems to work. for now...
+    public void OnMouseDown(Event e, GameObject clickedOn)
+    {
+        Tile tile = GetTile(clickedOn);
+        if (state == EditorState.ADD_REMOVE)
+        {
+            if (e.button == 0)
+            {
+                ChangeColor(tile.GetComponent<Renderer>(), removeColor);
+                _toRemove.Add(tile);
+                Debug.Log(_toRemove.Count);
+            }
+            else if (e.button == 1)
+            {
+                ChangeColor(tile.GetComponent<Renderer>(), keepColor);
+                _toRemove.Remove(tile);
+                Debug.Log(_toRemove.Count);
+            }
+
+
+        }
+        else if (state == EditorState.PAINT)
+        {
+            if (e.button == 0)
+            {
+                if (e.control)
+                {
+                    paintColor = clickedOn.GetComponent<Renderer>().sharedMaterial.color;
+                }
+                ChangeColor(clickedOn.GetComponent<Renderer>(), paintColor);
+            }
+            else if (e.button == 1)
+            {
+                if (e.control)
+                {
+                    paintSecondaryColor = clickedOn.GetComponent<Renderer>().sharedMaterial.color;
+                }
+                ChangeColor(clickedOn.GetComponent<Renderer>(), paintSecondaryColor);
+            }
+
+
+        }
+        else if (state == EditorState.RAISE_LOWER)
+        {
+            float inc = raiseHeight;
+            if (e.shift)
+            {
+                inc = inc * .5f;
+            }
+            if (e.button == 0)
+            {
+                tile.RaiseTile(inc);
+            }
+            else if (e.button == 1)
+            {
+                tile.LowerTile(inc);
+            }
+
+        }
+        else if (state == EditorState.TEXTURE)
+        {
+            if (e.control)
+            {
+                paintTexture = clickedOn.GetComponent<Renderer>().sharedMaterial.mainTexture;
+            }
+            else
+            {
+                ChangeTexture(clickedOn.GetComponent<Renderer>(), paintTexture);
+
+            }
+        }
+        else if (state == EditorState.ROTATE)
+        {
+            clickedOn.transform.Rotate(clickedOn.transform.up, rotateBy);
+        }
+        else if (state == EditorState.PLACE_OBJECT)
+        {
+            if (e.button == 0)
+                tile.PlaceObject(objToPlace, visitableOnPlace);
+            else if (e.button == 1)
+                tile.RemoveObject();
+        }
+    }
+
+    public void OnKeyDown(Event e)
+    {
+        if (e.keyCode == KeyCode.I)
+        {
+            ChangeState(EditorState.ADD_REMOVE, state);
+        }
+        else if (e.keyCode == KeyCode.P)
+        {
+            ChangeState(EditorState.PAINT, state);
+        }
+        else if (e.keyCode == KeyCode.R)
+        {
+            ChangeState(EditorState.RAISE_LOWER, state);
+        }
+        else if (e.keyCode == KeyCode.T)
+        {
+            ChangeState(EditorState.TEXTURE, state);
+        }
+        else if (e.keyCode == KeyCode.O)
+        {
+            ChangeState(EditorState.ROTATE, state);
+        }
+        else if (e.keyCode == KeyCode.U)
+        {
+            ChangeState(EditorState.PLACE_OBJECT, state);
+        }
+        
+    }
+    // Don't call e.Use() every frame or the scene view will never update until you manually click out and back in!!
+    void OnSceneGUI()
+    {
+
+       
+        Event e = Event.current;
+        // Get controlID to prevent clicking to deselect the selected object in hierarchy
+        HandleUtility.AddDefaultControl(GUIUtility.GetControlID(GetHashCode(), FocusType.Passive));
+
+        if (e.type == EventType.MouseMove)
+        {
+            OnMouseMove(e);
+            e.Use();
+        }
         if (e.type == EventType.MouseDrag || e.type == EventType.MouseDown)
         {
             RaycastHit hit;
@@ -87,51 +207,20 @@ public class TileMapEditor : Editor {
             
             if (Physics.Raycast(ray, out hit))
             {
-
-                Tile tile = hit.collider.gameObject.GetComponent<Tile>();
-                if (tile != null)
-                {
-                    TileInteractionHandler(e, tile);
-                    
-                } else
-                {
-                    GameObjectInteractionHandler(e, hit.collider.gameObject);
-                }
-
+                OnMouseDown(e, hit.collider.gameObject);
             }
             e.Use();
         }
         else if (e.type == EventType.KeyDown )
         {
-            if (e.keyCode == KeyCode.I)
-            {
-                ChangeState(EditorState.ADD_REMOVE, state);
-                
-            } else if (e.keyCode == KeyCode.P)
-            {
-                ChangeState(EditorState.PAINT, state);
-            }
-            else if (e.keyCode == KeyCode.R)
-            {
-                ChangeState(EditorState.RAISE_LOWER, state);
-            }
-            else if (e.keyCode == KeyCode.T)
-            {
-                ChangeState(EditorState.TEXTURE, state);
-            }
-            else if (e.keyCode == KeyCode.O)
-            {
-                ChangeState(EditorState.ROTATE, state);
-            } else if (e.keyCode == KeyCode.U)
-            {
-                ChangeState(EditorState.PLACE_OBJECT, state);
-            }
+            OnKeyDown(e);
             e.Use();
-        } 
 
-        // Forces inspector to redraw. Useful for situations where inspector is
-        // modified outside of OnInspectorGUI
-        Repaint();
+        }
+
+        Repaint();   // Forces inspector to redraw. Useful for situations where inspector is modified outside of OnInspectorGUI
+
+
     }
 
 
@@ -139,6 +228,10 @@ public class TileMapEditor : Editor {
     {
         state = newState;
         SetOnlyStateToggleTrue((int)newState);
+        if (currState == EditorState.PLACE_OBJECT)
+        {
+            DestroyImmediate(objToPlacePreview);
+        }
         if (newState == EditorState.ADD_REMOVE)
         {
             
@@ -187,6 +280,7 @@ public class TileMapEditor : Editor {
 
     public override void OnInspectorGUI()
     {
+
         bool[] cachedStateToggles = Copy(stateToggles);
 
         GUIStyle labelStyle = new GUIStyle();
