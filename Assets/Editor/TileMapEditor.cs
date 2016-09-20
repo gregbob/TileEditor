@@ -2,7 +2,7 @@
 using UnityEditor;
 using System.Collections;
 using System.Collections.Generic;
-
+using UnityEditor.SceneManagement;
 
 public enum EditorState { ADD_REMOVE, PAINT, RAISE_LOWER, TEXTURE, ROTATE, PLACE_OBJECT, SELECT };
 
@@ -193,7 +193,6 @@ public class TileMapEditor : Editor {
         Event e = Event.current;
         // Get controlID to prevent clicking to deselect the selected object in hierarchy
         HandleUtility.AddDefaultControl(GUIUtility.GetControlID(GetHashCode(), FocusType.Passive));
-
         if (e.type == EventType.MouseMove)
         {
             OnMouseMove(e);
@@ -210,17 +209,18 @@ public class TileMapEditor : Editor {
                 OnMouseDown(e, hit.collider.gameObject);
             }
             e.Use();
+            EditorSceneManager.MarkAllScenesDirty();        // Allows scene to be saved. Need a better fix.
         }
         else if (e.type == EventType.KeyDown )
         {
             OnKeyDown(e);
             e.Use();
-
+            EditorSceneManager.MarkAllScenesDirty();
         }
 
         Repaint();   // Forces inspector to redraw. Useful for situations where inspector is modified outside of OnInspectorGUI
 
-
+        
     }
 
 
@@ -278,19 +278,31 @@ public class TileMapEditor : Editor {
         return -1;
     }
 
+    private void CreateSectionLabel(string name)
+    {
+        GUIStyle sectionLabelStyle = new GUIStyle();
+        sectionLabelStyle.fontSize = 15;
+        sectionLabelStyle.alignment = TextAnchor.UpperCenter;
+        sectionLabelStyle.border = new RectOffset(10, 10, 10, 10);
+        sectionLabelStyle.fontStyle = FontStyle.Bold;
+        EditorGUILayout.LabelField(name, sectionLabelStyle);
+        EditorGUILayout.Space();
+        EditorGUILayout.Space();
+    }
+
     public override void OnInspectorGUI()
     {
+        bool[] cachedStateToggles = Copy(stateToggles); // Store initial state of toggles to check if its changed
 
-        bool[] cachedStateToggles = Copy(stateToggles);
 
-        GUIStyle labelStyle = new GUIStyle();
-        labelStyle.fontSize = 16;
-       
-        EditorGUILayout.LabelField("Parameters", labelStyle);
+        CreateSectionLabel("Paramaters");
+
         DrawDefaultInspector();
+
         EditorGUILayout.Space();
         EditorGUILayout.Space();
-        EditorGUILayout.LabelField("Editor", labelStyle);
+
+        CreateSectionLabel("Editor");
 
         // Add/Remove state
         stateToggles[(int)EditorState.ADD_REMOVE] = EditorGUILayout.BeginToggleGroup("Add or remove tiles [I]", stateToggles[(int)EditorState.ADD_REMOVE]);

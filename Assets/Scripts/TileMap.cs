@@ -36,7 +36,7 @@ public class TileMap : MonoBehaviour {
     // Use this for initialization
     void Start()
     {
-        BFS(tiles[0][0], tiles[(int)size.x - 1][(int)size.y - 1], heightValid);
+        BFS(tiles[1][1], tiles[(int)size.x - 1][(int)size.y - 1], heightValid);
     }
 
     // Update is called once per frame
