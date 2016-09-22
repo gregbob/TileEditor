@@ -19,6 +19,7 @@ public class TileMapEditor : Editor {
     private Color paintColor = Color.white;
     private Color paintSecondaryColor = Color.black;
 
+    private Material paintMaterial;
     private Texture paintTexture;
     private GameObject objToPlace;
     private GameObject objToPlacePreview;
@@ -29,21 +30,33 @@ public class TileMapEditor : Editor {
 
     private Texture[] allTextures;
     private GameObject[] allPrefabs;
+    private Material[] allMaterials;
+
+    private ResizableSelectionWindow prefabSelection;
+    private ResizableSelectionWindow materialSelection;
 
 
-    
+
+
     void OnEnable()
     {  
         stateToggles[(int)EditorState.ADD_REMOVE] = true;
 
         allTextures = FindAllTextures();
         allPrefabs = FindAllPrefabs();
-
+        allMaterials = System.Array.ConvertAll(FindAllAssets("material"), item => (Material)item);
+        //allMaterials = FindAllMaterials();
+        prefabSelection = new ResizableSelectionWindow(64);
+        materialSelection = new ResizableSelectionWindow(64);
+        prefabSelection.onSelection += PrefabSelection;
+        materialSelection.onSelection += MaterialSelection;
     }
 
     void OnDisable()
     {
         DestroyImmediate(objToPlacePreview);
+
+        prefabSelection.onSelection -= PrefabSelection;
     }
 
     private Tile GetTile(GameObject obj)
@@ -136,11 +149,12 @@ public class TileMapEditor : Editor {
         {
             if (e.control)
             {
-                paintTexture = clickedOn.GetComponent<Renderer>().sharedMaterial.mainTexture;
+                paintMaterial = clickedOn.GetComponent<Renderer>().material;
             }
             else
             {
-                ChangeTexture(clickedOn.GetComponent<Renderer>(), paintTexture);
+                clickedOn.GetComponent<Renderer>().material = paintMaterial;
+                //ChangeTexture(clickedOn.GetComponent<Renderer>(), paintTexture);
 
             }
         }
@@ -346,10 +360,11 @@ public class TileMapEditor : Editor {
         // Texture state
         stateToggles[(int)EditorState.TEXTURE] = EditorGUILayout.BeginToggleGroup("Texture tiles [T]", stateToggles[(int)EditorState.TEXTURE]);
 
-        EditorGUILayout.ObjectField("Texture to paint", paintTexture, typeof(Texture), true);
+        EditorGUILayout.ObjectField("Texture to paint", paintMaterial, typeof(Material), true);
         GUILayout.FlexibleSpace();
         Vector2 aboveGuiPos = GUILayoutUtility.GetLastRect().position;
-        Vector2 bottom = CreateResizableTextureBox(aboveGuiPos, allTextures);
+        materialSelection.CreateResizableBox(aboveGuiPos, allMaterials);
+        //Vector2 bottom = CreateResizableTextureBox(aboveGuiPos, allTextures);
         EditorGUILayout.EndToggleGroup();
 
 
@@ -365,7 +380,7 @@ public class TileMapEditor : Editor {
         stateToggles[(int)EditorState.PLACE_OBJECT] = EditorGUILayout.BeginToggleGroup("Place Object [U]", stateToggles[(int)EditorState.PLACE_OBJECT]);
         objToPlace = (GameObject)EditorGUILayout.ObjectField("Object to place", objToPlace, typeof(GameObject), true);
         visitableOnPlace = EditorGUILayout.Toggle("Tile visitable after placing object?", visitableOnPlace);
-        CreateResizablePrefabBox(GUILayoutUtility.GetLastRect().position, allPrefabs);
+        prefabSelection.CreateResizableBox(GUILayoutUtility.GetLastRect().position, allPrefabs);
         EditorGUILayout.EndToggleGroup();
 
         GUILayout.FlexibleSpace();
@@ -431,6 +446,25 @@ public class TileMapEditor : Editor {
             }
         }
 
+    }
+
+    public void MaterialSelection(object sender, OnSelectionEventArgs e)
+    {
+        paintMaterial = (Material)e.clicked;
+    }
+
+    public void PrefabSelection(object sender, OnSelectionEventArgs e)
+    {
+        TileMap tm = target as TileMap;
+
+        objToPlace = (GameObject)e.clicked;
+        if (objToPlacePreview != null)
+            DestroyImmediate(objToPlacePreview);
+
+        objToPlacePreview = Instantiate(objToPlace);
+        objToPlacePreview.GetComponent<Collider>().enabled = false;
+        
+        objToPlacePreview.transform.SetParent(tm.transform);
     }
 
     public Vector2 CreateResizableTextureBox(Vector2 position, Texture[] textures)
@@ -616,6 +650,31 @@ public class TileMapEditor : Editor {
             else if (e.button == 1)
                 tile.RemoveObject();
         }
+    }
+
+    private Material[] FindAllMaterials()
+    {
+        List<Material> objs = new List<Material>();
+        foreach (string guid in AssetDatabase.FindAssets("t:material"))
+        {
+            string path = AssetDatabase.GUIDToAssetPath(guid);
+            objs.Add((Material)AssetDatabase.LoadAssetAtPath(path, typeof(Material)));
+            Debug.Log(path);
+
+        }
+        return objs.ToArray();
+    }
+
+    private Object[] FindAllAssets(string type)
+    {
+        List<Object> objs = new List<Object>();
+        foreach (string guid in AssetDatabase.FindAssets("t:"+type))
+        {
+            string path = AssetDatabase.GUIDToAssetPath(guid);
+            Debug.Log(path);
+            objs.Add((Object)AssetDatabase.LoadAssetAtPath(path, typeof(Object)));
+        }
+        return objs.ToArray();
     }
 
     private GameObject[] FindAllPrefabs()
