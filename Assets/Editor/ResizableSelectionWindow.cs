@@ -23,6 +23,8 @@ public class ResizableSelectionWindow  {
     public delegate void OnSelection(object sender, OnSelectionEventArgs e);
     public event OnSelection onSelection;
 
+    private Vector2 scrollPos;
+
     public ResizableSelectionWindow (int iconSize)
     {
         this.iconSize = iconSize;
@@ -30,39 +32,33 @@ public class ResizableSelectionWindow  {
 
 
 
-    public void CreateResizableBox(Vector2 position, Object[] objs)
+    public void CreateResizableBox(Object[] objs)
     {
 
-        //   Vector2 guiAbove = GUILayoutUtility.GetLastRect().position;
-        // Width of current window. Gives width of inspector.
+        scrollPos = GUILayout.BeginScrollView(scrollPos, GUILayout.ExpandHeight(true), GUILayout.MaxHeight(iconSize * 3), GUILayout.MinHeight(iconSize));
 
         int textHeight = 15;
         int boxWidth = Screen.width;
         int numTextures = objs.Length;
         int numTilesInRow = boxWidth / iconSize;
 
-        int numRows = (numTextures + numTextures - 1) / numTilesInRow; // Rounded up integer division
+        int numRows = (numTextures + numTilesInRow - 1) / numTilesInRow; // Rounded up integer division
         int boxHeight = numRows * iconSize;
-        int boxPadding = 20;
+        int boxPadding = 0;
 
-        GUIStyle boxStyle = new GUIStyle();
-        boxStyle.padding = new RectOffset(0, 0, 10, 10);
-
-        GUIStyle g = new GUIStyle();
-        g.padding = new RectOffset(5, 5, 10, 0);
-        GUI.Box(new Rect(position.x, position.y + boxPadding, boxWidth - position.x * 2, boxHeight), "");
+        GUILayout.Box("", GUILayout.Height(boxHeight));
 
         int count = 0;                          // Decides index in the row
         int row = 0;                            // Decides which row
+        Debug.Log(numTilesInRow);
         for (int i = 0; i < numTextures; i++)
         {
-
             Texture2D icon = UnityEditor.AssetPreview.GetAssetPreview(objs[i]);
-            if (GUI.Button(new Rect(count * iconSize + position.x, row * iconSize + position.y + boxPadding, iconSize, iconSize), icon, g))
+            if (GUI.Button(new Rect(count * iconSize, row * iconSize + boxPadding, iconSize, iconSize), icon))
             {
                 onSelection(this, CreateOnSelectionEvent(objs[i], icon));
             }
-            GUI.TextArea(new Rect(count * iconSize + position.x, row * iconSize + position.y + boxPadding, iconSize, textHeight),objs[i].ToString());
+            GUI.TextArea(new Rect(count * iconSize, row * iconSize + boxPadding, iconSize, textHeight),objs[i].ToString());
             count++;
             if (count >= numTilesInRow)
             {
@@ -70,7 +66,7 @@ public class ResizableSelectionWindow  {
                 row += 1;
             }
         }
-
+        GUILayout.EndScrollView();
     }
 
     private OnSelectionEventArgs CreateOnSelectionEvent(object clicked, Texture2D icon)

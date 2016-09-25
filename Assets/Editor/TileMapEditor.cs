@@ -4,6 +4,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEditor.SceneManagement;
 
+
 public enum EditorState { ADD_REMOVE, PAINT, RAISE_LOWER, TEXTURE, ROTATE, PLACE_OBJECT, SELECT };
 
 [CustomEditor (typeof(TileMap))]
@@ -14,27 +15,24 @@ public class TileMapEditor : Editor {
     private float raiseHeight = 1;
     private float rotateBy = 90;
 
-    private Color removeColor = Color.red;
-    private Color keepColor = Color.white;
-    private Color paintColor = Color.white;
-    private Color paintSecondaryColor = Color.black;
-
     private Material paintMaterial;
-    private Texture paintTexture;
     private GameObject objToPlace;
     private GameObject objToPlacePreview;
     private bool visitableOnPlace = true;
     private EditorState state = EditorState.ADD_REMOVE;
     private bool[] stateToggles = new bool[6]; // Number of states
-    private Vector2 paintTextureScrollLevel = new Vector2(0,0);
 
-    private Texture[] allTextures;
     private GameObject[] allPrefabs;
     private Material[] allMaterials;
 
     private ResizableSelectionWindow prefabSelection;
     private ResizableSelectionWindow materialSelection;
 
+    private TileSelection tileSelection;
+    private TileSelectionState tss;
+
+    private TilePainter tilePainter;
+    private TilePainterState tps;
 
 
 
@@ -42,14 +40,19 @@ public class TileMapEditor : Editor {
     {  
         stateToggles[(int)EditorState.ADD_REMOVE] = true;
 
-        allTextures = FindAllTextures();
-        allPrefabs = FindAllPrefabs();
-        allMaterials = System.Array.ConvertAll(FindAllAssets("material"), item => (Material)item);
-        //allMaterials = FindAllMaterials();
+        allPrefabs = System.Array.ConvertAll(FindAssets.FindAllAssets("prefab"), item => (GameObject)item);
+        allMaterials = System.Array.ConvertAll(FindAssets.FindAllAssets("material"), item => (Material)item);
         prefabSelection = new ResizableSelectionWindow(64);
         materialSelection = new ResizableSelectionWindow(64);
         prefabSelection.onSelection += PrefabSelection;
         materialSelection.onSelection += MaterialSelection;
+
+        tileSelection = new TileSelection(target as TileMap);
+        tss = new TileSelectionState(tileSelection);
+
+        tilePainter = new TilePainter();
+        tps = new TilePainterState(tilePainter);
+        
     }
 
     void OnDisable()
@@ -94,37 +97,34 @@ public class TileMapEditor : Editor {
         {
             if (e.button == 0)
             {
-                ChangeColor(tile.GetComponent<Renderer>(), removeColor);
-                _toRemove.Add(tile);
-                Debug.Log(_toRemove.Count);
+                tileSelection.Select(tile);
+
             }
             else if (e.button == 1)
             {
-                ChangeColor(tile.GetComponent<Renderer>(), keepColor);
-                _toRemove.Remove(tile);
-                Debug.Log(_toRemove.Count);
+                tileSelection.Deselect(tile);
             }
 
 
         }
         else if (state == EditorState.PAINT)
         {
-            if (e.button == 0)
-            {
-                if (e.control)
-                {
-                    paintColor = clickedOn.GetComponent<Renderer>().sharedMaterial.color;
-                }
-                ChangeColor(clickedOn.GetComponent<Renderer>(), paintColor);
-            }
-            else if (e.button == 1)
-            {
-                if (e.control)
-                {
-                    paintSecondaryColor = clickedOn.GetComponent<Renderer>().sharedMaterial.color;
-                }
-                ChangeColor(clickedOn.GetComponent<Renderer>(), paintSecondaryColor);
-            }
+            //if (e.button == 0)
+            //{
+            //    if (e.control)
+            //    {
+            //        paintColor = clickedOn.GetComponent<Renderer>().sharedMaterial.color;
+            //    }
+            //    gregbob.EditorUtility.ChangeColor(clickedOn.GetComponent<Renderer>(), paintColor);
+            //}
+            //else if (e.button == 1)
+            //{
+            //    if (e.control)
+            //    {
+            //        paintSecondaryColor = clickedOn.GetComponent<Renderer>().sharedMaterial.color;
+            //    }
+            //    gregbob.EditorUtility.ChangeColor(clickedOn.GetComponent<Renderer>(), paintSecondaryColor);
+            //}
 
 
         }
@@ -202,9 +202,27 @@ public class TileMapEditor : Editor {
     // Don't call e.Use() every frame or the scene view will never update until you manually click out and back in!!
     void OnSceneGUI()
     {
-
-       
         Event e = Event.current;
+
+        if (e.type == EventType.KeyDown)
+        {
+            OnKeyDown(e);
+            e.Use();
+            EditorSceneManager.MarkAllScenesDirty();
+        }
+
+        if (state == EditorState.ADD_REMOVE)
+        {
+            tss.OnSceneGUI(Event.current);
+            Debug.Log("??");
+            return;
+        } else if (state == EditorState.PAINT)
+        {
+            tps.OnSceneGUI(Event.current);
+            return;
+        }
+       
+        
         // Get controlID to prevent clicking to deselect the selected object in hierarchy
         HandleUtility.AddDefaultControl(GUIUtility.GetControlID(GetHashCode(), FocusType.Passive));
         if (e.type == EventType.MouseMove)
@@ -224,12 +242,6 @@ public class TileMapEditor : Editor {
             }
             e.Use();
             EditorSceneManager.MarkAllScenesDirty();        // Allows scene to be saved. Need a better fix.
-        }
-        else if (e.type == EventType.KeyDown )
-        {
-            OnKeyDown(e);
-            e.Use();
-            EditorSceneManager.MarkAllScenesDirty();
         }
 
         Repaint();   // Forces inspector to redraw. Useful for situations where inspector is modified outside of OnInspectorGUI
@@ -271,26 +283,8 @@ public class TileMapEditor : Editor {
         }        
     }
 
-    private bool[] Copy(bool[] a)
-    {
-        bool[] copy = new bool[a.Length];
 
-        for (int i = 0; i < a.Length; i++)
-        {
-            copy[i] = a[i];
-        }
-        return copy;
-    }
-
-    private int FindDifferentElement(bool[] a, bool[] b)
-    {
-        for (int i = 0; i < a.Length; i++)
-        {
-            if (a[i] != b[i])
-                return i;
-        }
-        return -1;
-    }
+    
 
     private void CreateSectionLabel(string name)
     {
@@ -306,7 +300,7 @@ public class TileMapEditor : Editor {
 
     public override void OnInspectorGUI()
     {
-        bool[] cachedStateToggles = Copy(stateToggles); // Store initial state of toggles to check if its changed
+        bool[] cachedStateToggles = ArrayUtility.ArrayCopy(stateToggles); // Store initial state of toggles to check if its changed
 
 
         CreateSectionLabel("Paramaters");
@@ -320,21 +314,13 @@ public class TileMapEditor : Editor {
 
         // Add/Remove state
         stateToggles[(int)EditorState.ADD_REMOVE] = EditorGUILayout.BeginToggleGroup("Add or remove tiles [I]", stateToggles[(int)EditorState.ADD_REMOVE]);
-        removeColor = EditorGUILayout.ColorField("Remove", removeColor);
-        keepColor = EditorGUILayout.ColorField("Keep", keepColor);
-        if (GUILayout.Button("Remove selected"))
-        {
-            TileMap tileMap = target as TileMap;
-            tileMap.RemoveSelected(HashSetToArray(_toRemove));
-            _toRemove.Clear();
-        }
+        tileSelection.OnGUI();
         EditorGUILayout.EndToggleGroup();
 
     
         // Paint state
         stateToggles[(int)EditorState.PAINT] = EditorGUILayout.BeginToggleGroup("Paint tiles [P]", stateToggles[(int)EditorState.PAINT]);
-        paintColor = EditorGUILayout.ColorField("Primary", paintColor);
-        paintSecondaryColor = EditorGUILayout.ColorField("Secondary", paintSecondaryColor);
+        tilePainter.OnGUI();
         EditorGUILayout.EndToggleGroup();
 
         // Raise/Lower state
@@ -359,18 +345,11 @@ public class TileMapEditor : Editor {
         
         // Texture state
         stateToggles[(int)EditorState.TEXTURE] = EditorGUILayout.BeginToggleGroup("Texture tiles [T]", stateToggles[(int)EditorState.TEXTURE]);
-
         EditorGUILayout.ObjectField("Texture to paint", paintMaterial, typeof(Material), true);
-        GUILayout.FlexibleSpace();
-        Vector2 aboveGuiPos = GUILayoutUtility.GetLastRect().position;
-        materialSelection.CreateResizableBox(aboveGuiPos, allMaterials);
-        //Vector2 bottom = CreateResizableTextureBox(aboveGuiPos, allTextures);
+        materialSelection.CreateResizableBox(allMaterials);
         EditorGUILayout.EndToggleGroup();
 
 
-        GUILayout.FlexibleSpace();
-
-    
         // Rotate state
         stateToggles[(int)EditorState.ROTATE] = EditorGUILayout.BeginToggleGroup("Rotate tiles [O]", stateToggles[(int)EditorState.ROTATE]);
         rotateBy = EditorGUILayout.FloatField("Rotate by: ", rotateBy);
@@ -380,10 +359,8 @@ public class TileMapEditor : Editor {
         stateToggles[(int)EditorState.PLACE_OBJECT] = EditorGUILayout.BeginToggleGroup("Place Object [U]", stateToggles[(int)EditorState.PLACE_OBJECT]);
         objToPlace = (GameObject)EditorGUILayout.ObjectField("Object to place", objToPlace, typeof(GameObject), true);
         visitableOnPlace = EditorGUILayout.Toggle("Tile visitable after placing object?", visitableOnPlace);
-        prefabSelection.CreateResizableBox(GUILayoutUtility.GetLastRect().position, allPrefabs);
+        prefabSelection.CreateResizableBox(allPrefabs);
         EditorGUILayout.EndToggleGroup();
-
-        GUILayout.FlexibleSpace();
 
 
         if (GUI.changed)
@@ -391,63 +368,13 @@ public class TileMapEditor : Editor {
 
 
         // Check to see if toggle value changed
-        int idx = FindDifferentElement(cachedStateToggles, stateToggles);
+        int idx = ArrayUtility.FindDifferentElement(cachedStateToggles, stateToggles);
         if (idx != -1)
             ChangeState((EditorState)idx, state);
         
     }
 
-    public void CreateResizablePrefabBox(Vector2 position, GameObject[] gameObjs)
-    {
-
-        //   Vector2 guiAbove = GUILayoutUtility.GetLastRect().position;
-        // Width of current window. Gives width of inspector.
-
-        int textureIconSize = 64;
-        int textHeight = 15;
-        int boxWidth = Screen.width;
-        int numTextures = gameObjs.Length;
-        int numTilesInRow = boxWidth / textureIconSize;
-
-        int numRows = (numTextures + numTextures - 1) / numTilesInRow; // Rounded up integer division
-        int boxHeight = numRows * textureIconSize;
-        int boxPadding = 20;
-
-        GUIStyle boxStyle = new GUIStyle();
-        boxStyle.padding = new RectOffset(0, 0, 10, 10);
-
-        GUIStyle g = new GUIStyle();
-        g.padding = new RectOffset(5, 5, 10, 0);
-        GUI.Box(new Rect(position.x, position.y + boxPadding, boxWidth - position.x * 2, boxHeight), "");
-
-        int count = 0;                          // Decides index in the row
-        int row = 0;                            // Decides which row
-        for (int i = 0; i < numTextures; i++)
-        {
-            if (GUI.Button(new Rect(count * textureIconSize + position.x, row * textureIconSize + position.y + boxPadding, textureIconSize, textureIconSize), AssetPreview.GetAssetPreview(gameObjs[i]), g))
-            {
-                objToPlace = gameObjs[i];
-                if (objToPlacePreview != null)                
-                    DestroyImmediate(objToPlacePreview);                   
-
-                objToPlacePreview = Instantiate(objToPlace);
-                objToPlacePreview.GetComponent<Collider>().enabled = false;
-                TileMap tm = target as TileMap;
-                objToPlacePreview.transform.SetParent(tm.transform);
-
-            }
-            GUI.TextArea(new Rect(count * textureIconSize + position.x, row * textureIconSize + position.y + boxPadding, textureIconSize, textHeight), gameObjs[i].name);
-
-            count++;
-            if (count >= numTilesInRow)
-            {
-                count = 0;
-                row += 1;
-            }
-        }
-
-    }
-
+    #region Delegates   
     public void MaterialSelection(object sender, OnSelectionEventArgs e)
     {
         paintMaterial = (Material)e.clicked;
@@ -467,258 +394,7 @@ public class TileMapEditor : Editor {
         objToPlacePreview.transform.SetParent(tm.transform);
     }
 
-    public Vector2 CreateResizableTextureBox(Vector2 position, Texture[] textures)
-    {
-
-     //   Vector2 guiAbove = GUILayoutUtility.GetLastRect().position;
-        // Width of current window. Gives width of inspector.
-       
-        int textureIconSize = 64;
-        int textHeight = 15;
-        int boxWidth = Screen.width;
-        int numTextures = textures.Length;
-        int numTilesInRow = boxWidth / textureIconSize;
-        
-        int numRows = (numTextures + numTextures - 1)/ numTilesInRow; // Rounded up integer division
-        int boxHeight = numRows * textureIconSize;
-        int boxPadding = 20;
-
-        GUIStyle boxStyle = new GUIStyle();
-        boxStyle.padding = new RectOffset(0, 0, 10, 10);
-
-        GUIStyle g = new GUIStyle();
-        g.padding = new RectOffset(5, 5, 10, 0);
-        GUI.Box(new Rect(position.x, position.y + boxPadding, boxWidth - position.x * 2, boxHeight),"");
-
-        int count = 0;                          // Decides index in the row
-        int row = 0;                            // Decides which row
-        for (int i = 0; i < numTextures; i++)
-        {
-            if (GUI.Button(new Rect(count * textureIconSize + position.x, row * textureIconSize + position.y  + boxPadding, textureIconSize, textureIconSize), textures[i], g))
-            {
-                paintTexture = textures[i];
-            }
-            GUI.TextArea(new Rect(count * textureIconSize + position.x, row * textureIconSize + position.y + boxPadding, textureIconSize, textHeight), textures[i].name);
-
-            count++;
-            if (count >= numTilesInRow)
-            {
-                count = 0;
-                row += 1;
-            }
-        }
-
-        return position + new Vector2(0, boxHeight);
-    }
-
-    public void GameObjectInteractionHandler(Event e, GameObject obj)
-    {
-        Debug.Log("Clicked on " + obj.name);
-        if (state == EditorState.TEXTURE)
-        {
-            ChangeTexture(obj.GetComponent<Renderer>(), paintTexture);
-        }
-        else if (state == EditorState.PAINT)
-        {
-            if (e.button == 0)
-            {
-                if (e.control)
-                {
-                    paintColor = obj.GetComponent<Renderer>().sharedMaterial.color;
-                }
-                ChangeColor(obj.GetComponent<Renderer>(), paintColor);
-            }
-            else if (e.button == 1)
-            {
-                if (e.control)
-                {
-                    paintSecondaryColor = obj.GetComponent<Renderer>().sharedMaterial.color;
-                }
-                ChangeColor(obj.GetComponent<Renderer>(), paintSecondaryColor);
-            }
-        }
-        else if (state == EditorState.RAISE_LOWER)
-        {
-            Tile tile = obj.GetComponentInParent<Tile>();
-            if (tile == null)
-                return;
-
-            float inc = raiseHeight;
-            if (e.shift)
-            {
-                inc = inc * .5f;
-            }
-            if (e.button == 0)
-            {
-                tile.RaiseTile(inc);
-            }
-            else if (e.button == 1)
-            {
-                tile.LowerTile(inc);
-            }
-
-        }
-        else if (state == EditorState.ROTATE)
-        {
-            obj.transform.Rotate(obj.transform.up, rotateBy);
-        }
-        else if (state == EditorState.PLACE_OBJECT)
-        {
-            Tile tile = obj.GetComponentInParent<Tile>();
-            if (tile == null)
-                return;
-            if (e.button == 0)
-                tile.PlaceObject(objToPlace, visitableOnPlace);
-            else if (e.button == 1)
-                tile.RemoveObject();
-        }
-    }
-
-    private void TileInteractionHandler(Event e, Tile tile)
-    {
-        if (state == EditorState.ADD_REMOVE)
-        {
-            if (e.button == 0)
-            {
-                ChangeColor(tile.GetComponent<Renderer>(), removeColor);
-                _toRemove.Add(tile);
-                Debug.Log(_toRemove.Count);
-            }
-            else if (e.button == 1)
-            {
-                ChangeColor(tile.GetComponent<Renderer>(), keepColor);
-                _toRemove.Remove(tile);
-                Debug.Log(_toRemove.Count);
-            }
-
-
-        }
-        else if (state == EditorState.PAINT)
-        {
-            if (e.button == 0)
-            {
-                if (e.control)
-                {
-                    paintColor = tile.GetComponent<Renderer>().sharedMaterial.color;
-                }
-                ChangeColor(tile.GetComponent<Renderer>(), paintColor);
-            } else if (e.button == 1)
-            {
-                if (e.control)
-                {
-                    paintSecondaryColor = tile.GetComponent<Renderer>().sharedMaterial.color;
-                }
-                ChangeColor(tile.GetComponent<Renderer>(), paintSecondaryColor);
-            }
-            
-            
-        }
-        else if (state == EditorState.RAISE_LOWER)
-        {
-            float inc = raiseHeight;
-            if (e.shift)
-            {
-                inc = inc * .5f;
-            }
-            if (e.button == 0)
-            {
-                tile.RaiseTile(inc);
-            }
-            else if (e.button == 1)
-            {
-                tile.LowerTile(inc);
-            }
-
-        }
-        else if (state == EditorState.TEXTURE)
-        {
-            if (e.control)
-            {
-                paintTexture = tile.GetComponent<Renderer>().sharedMaterial.mainTexture;
-            } else
-            {
-                ChangeTexture(tile.GetComponent<Renderer>(), paintTexture);
-
-            }
-        } else if (state == EditorState.ROTATE)
-        {
-            tile.transform.Rotate(tile.transform.up, rotateBy);
-        } else if (state == EditorState.PLACE_OBJECT)
-        {
-            if (e.button == 0)
-                tile.PlaceObject(objToPlace, visitableOnPlace);
-            else if (e.button == 1)
-                tile.RemoveObject();
-        }
-    }
-
-    private Material[] FindAllMaterials()
-    {
-        List<Material> objs = new List<Material>();
-        foreach (string guid in AssetDatabase.FindAssets("t:material"))
-        {
-            string path = AssetDatabase.GUIDToAssetPath(guid);
-            objs.Add((Material)AssetDatabase.LoadAssetAtPath(path, typeof(Material)));
-            Debug.Log(path);
-
-        }
-        return objs.ToArray();
-    }
-
-    private Object[] FindAllAssets(string type)
-    {
-        List<Object> objs = new List<Object>();
-        foreach (string guid in AssetDatabase.FindAssets("t:"+type))
-        {
-            string path = AssetDatabase.GUIDToAssetPath(guid);
-            Debug.Log(path);
-            objs.Add((Object)AssetDatabase.LoadAssetAtPath(path, typeof(Object)));
-        }
-        return objs.ToArray();
-    }
-
-    private GameObject[] FindAllPrefabs()
-    {
-        List<GameObject> objs = new List<GameObject>();
-        foreach (string guid in AssetDatabase.FindAssets("t:prefab"))
-        {
-            string path = AssetDatabase.GUIDToAssetPath(guid);
-            objs.Add((GameObject)AssetDatabase.LoadAssetAtPath(path, typeof(GameObject)));
-            Debug.Log(path);
-            
-        }
-        return objs.ToArray();
-    }
-
-    private Texture[] FindAllTextures()
-    {
-        List<string> paths = new List<string>();
-
-        foreach (string guid in AssetDatabase.FindAssets("t:Texture"))
-        {
-            string tex = AssetDatabase.GUIDToAssetPath(guid);
-            if (tex.Contains(".png") || tex.Contains(".jpg") || tex.Contains(".jpeg"))
-                paths.Add(tex);
-        }
-
-        Texture[] textures = new Texture[paths.Count];
-        for (int i = 0; i < paths.Count; i++)
-        {
-            textures[i] = AssetDatabase.LoadAssetAtPath(paths[i], typeof(Texture)) as Texture;
-        }
-
-        return textures;
-    }
-
-
-    private void PlaceObject(Tile tile, GameObject toPlace)
-    {
-        float topOfTile = tile.transform.position.y + tile.transform.localScale.y / 2 + toPlace.transform.localScale.y / 2;
-        Vector3 pos = new Vector3(tile.transform.position.x, topOfTile, tile.transform.position.z);
-
-        GameObject created = Instantiate(toPlace, pos, Quaternion.identity) as GameObject;
-        created.transform.SetParent(tile.transform);
-    }
+    #endregion
 
     /// <summary>
     /// 
@@ -732,40 +408,9 @@ public class TileMapEditor : Editor {
         }
         stateToggles[idx] = true;
     }
-    /// <summary>
-    /// Creates a new material to avoid leaking memory when changing shared material in editor.
-    /// Changing shared material changes all objects with the material on it. This is not desired for this case.
-    /// </summary>
-    /// <param name="renderer"></param>
-    /// <param name="texture"></param>
-    private void ChangeTexture(Renderer renderer, Texture texture)
-    {
-        var tempMaterial = new Material(renderer.sharedMaterial);
-        tempMaterial.mainTexture = texture;
-        renderer.sharedMaterial = tempMaterial;
-    }
 
-    private void ChangeColor(Renderer renderer, Color color)
-    {
-        var tempMaterial = new Material(renderer.sharedMaterial);
-        tempMaterial.color = color;
-        renderer.sharedMaterial = tempMaterial;
-    }
 
-    private Tile[] HashSetToArray(HashSet<Tile> set)
-    {
-        Tile[] arr = new Tile[set.Count];
 
-        var enumerator = set.GetEnumerator();
-
-        int i = 0;
-        while (enumerator.MoveNext())
-        {           
-            arr[i] = enumerator.Current;
-            i++;
-        }
-        return arr;
-    }
 
 
 }

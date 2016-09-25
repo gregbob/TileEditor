@@ -110,4 +110,17 @@ public class Tile : MonoBehaviour {
         canVisit = true;
         attachedObj = null;
     }
+
+    public static Tile GetTile(GameObject obj)
+    {
+        Tile tile = null;
+        tile = obj.GetComponent<Tile>();
+        if (tile != null)
+            return tile;
+        tile = obj.GetComponentInParent<Tile>();
+        if (tile != null)
+            return tile;
+
+        return null;
+    }
 }
