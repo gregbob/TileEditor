@@ -59,4 +59,16 @@ public class FindAssets {
         return textures;
     }
 
+    public static Texture GetMaterialIcon()
+    {
+        List<Object> objs = new List<Object>();
+        foreach (string guid in AssetDatabase.FindAssets("t:material"))
+        {
+            string path = AssetDatabase.GUIDToAssetPath(guid);
+            objs.Add(AssetDatabase.LoadAssetAtPath(path, typeof(Object)));
+        }
+        return AssetPreview.GetAssetPreview(objs[0]);
+    }
+
+
 }

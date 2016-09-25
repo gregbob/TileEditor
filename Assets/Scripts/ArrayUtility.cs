@@ -38,7 +38,6 @@ public class ArrayUtility  {
         for (int i = 0; i < a.Length; i++)
         {
             copy[i] = a[i];
-            Debug.Log(copy[i]);
         }
         return copy;
     }
@@ -59,5 +58,19 @@ public class ArrayUtility  {
         }
         return -1;
     }
-   
+
+
+    /// <summary>
+    /// Set idx to true. Set all others false.
+    /// </summary>
+    /// <param name="idx"></param>
+    private void SetOnlyIndexTrue(bool[] arr, int idx)
+    {
+        for (int i = 0; i < arr.Length; i++)
+        {
+            arr[i] = false;
+        }
+        arr[idx] = true;
+    }
+
 }

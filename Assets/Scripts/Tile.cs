@@ -9,7 +9,7 @@ public class Tile : MonoBehaviour {
     public float height = 0;
     public GameObject attachedObj;
     public GameObject raiseTile;
-    
+    private Renderer render;
     void OnDrawGizmos()
     {
         if (!canVisit)
@@ -23,14 +23,18 @@ public class Tile : MonoBehaviour {
 
     }
 	// Use this for initialization
-	void Start () {
-	
+	void Awake () {
+        render = GetComponent<Renderer>();
 	}
 	
 	// Update is called once per frame
 	void Update () {
 	
 	}
+    public void Highlight(Color color)
+    {
+        gregbob.EditorUtility.ChangeColor(FindHighestTile().GetComponent<Renderer>(), color);
+    }
 
     public int GetX()
     {

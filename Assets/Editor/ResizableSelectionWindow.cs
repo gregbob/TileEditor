@@ -50,7 +50,6 @@ public class ResizableSelectionWindow  {
 
         int count = 0;                          // Decides index in the row
         int row = 0;                            // Decides which row
-        Debug.Log(numTilesInRow);
         for (int i = 0; i < numTextures; i++)
         {
             Texture2D icon = UnityEditor.AssetPreview.GetAssetPreview(objs[i]);

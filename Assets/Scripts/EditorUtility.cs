@@ -26,6 +26,19 @@ namespace gregbob {
             renderer.sharedMaterial = tempMaterial;
         }
 
+        public static void CreateSectionLabel(string name)
+        {
+            EditorGUILayout.Space();
+            EditorGUILayout.Space();
+            GUIStyle sectionLabelStyle = new GUIStyle();
+            sectionLabelStyle.fontSize = 15;
+            sectionLabelStyle.alignment = TextAnchor.UpperCenter;
+            sectionLabelStyle.border = new RectOffset(10, 10, 10, 10);
+            sectionLabelStyle.fontStyle = FontStyle.Bold;
+            EditorGUILayout.LabelField(name, sectionLabelStyle);
+            EditorGUILayout.Space();
+            EditorGUILayout.Space();
+        }
     }
 }
 

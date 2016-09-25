@@ -4,14 +4,26 @@ using UnityEditor;
 
 public class TilePainterState : TileEditorState {
 
-    TilePainter tilePainter;
+    Color paintColor = Color.white;
+    Color paintSecondaryColor = Color.black;
 
-    public TilePainterState(TilePainter tilePainter)
+    public TilePainterState()
     {
-        this.tilePainter = tilePainter;
+
     }
 
-    public void OnSceneGUI(Event e)
+    public override void OnGUI()
+    {
+        gregbob.EditorUtility.CreateSectionLabel("Paint tiles");
+        GUILayout.BeginHorizontal();
+        paintColor = EditorGUILayout.ColorField("Primary", paintColor);
+        paintSecondaryColor = EditorGUILayout.ColorField("Secondary", paintSecondaryColor);
+        GUILayout.EndHorizontal();
+    }
+
+    
+
+    public override void OnSceneGUI(Event e)
     {
         HandleUtility.AddDefaultControl(GUIUtility.GetControlID(GetHashCode(), FocusType.Passive));
 
@@ -30,17 +42,17 @@ public class TilePainterState : TileEditorState {
                     {
                         if (e.control)
                         {
-                            tilePainter.paintColor = clickedOn.GetComponent<Renderer>().sharedMaterial.color;
+                           paintColor = clickedOn.GetComponent<Renderer>().sharedMaterial.color;
                         }
-                        gregbob.EditorUtility.ChangeColor(clickedOn.GetComponent<Renderer>(), tilePainter.paintColor);
+                        gregbob.EditorUtility.ChangeColor(clickedOn.GetComponent<Renderer>(), paintColor);
                     }
                     else if (e.button == 1)
                     {
                         if (e.control)
                         {
-                            tilePainter.paintSecondaryColor = clickedOn.GetComponent<Renderer>().sharedMaterial.color;
+                            paintSecondaryColor = clickedOn.GetComponent<Renderer>().sharedMaterial.color;
                         }
-                        gregbob.EditorUtility.ChangeColor(clickedOn.GetComponent<Renderer>(), tilePainter.paintSecondaryColor);
+                        gregbob.EditorUtility.ChangeColor(clickedOn.GetComponent<Renderer>(), paintSecondaryColor);
                     }
 
 
