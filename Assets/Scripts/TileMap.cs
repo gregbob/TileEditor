@@ -28,8 +28,7 @@ public class TileMap : MonoBehaviour {
     
     public Row[] tiles;
 
-    [SerializeField]
-    private Vector2 size;
+    public Vector2 size;
 
     public delegate bool IsValid(Tile source, Tile destination, Row[] map);
 

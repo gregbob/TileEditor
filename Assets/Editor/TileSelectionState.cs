@@ -1,15 +1,19 @@
 ﻿using UnityEngine;
 using System.Collections;
 using UnityEditor;
+using System.Collections.Generic;
 
 [System.Serializable]
 public class TileSelectionState : TileEditorState {
 
     TileSelection selector;
 
+    private List<Tile> square = new List<Tile>();
+
     public TileSelectionState(TileSelection selector)
     {
         this.selector = selector;
+
     }
 
     public void OnSceneGUI(Event e)
@@ -27,15 +31,31 @@ public class TileSelectionState : TileEditorState {
                 Tile tile = Tile.GetTile(hit.collider.gameObject);
                 if (tile != null)
                 {
-                    if (e.button == 0)
+                    if (e.shift)
                     {
                         selector.Select(tile);
+                        square.Add(tile);
+                        if (square.Count == 2)
+                        {
+                            selector.SelectRangeSquare(square[0], square[1]);
+                            square.Clear();
 
-                    }
-                    else if (e.button == 1)
+                        }
+                    } else
                     {
-                        selector.Deselect(tile);
+                        if (e.button == 0)
+                        {
+                            selector.Select(tile);
+
+                        }
+                        else if (e.button == 1)
+                        {
+                            selector.Deselect(tile);
+                        }
+
+                        square.Clear();
                     }
+                    
 
 
                 }
@@ -44,4 +64,6 @@ public class TileSelectionState : TileEditorState {
             //EditorSceneManager.MarkAllScenesDirty();        // Allows scene to be saved. Need a better fix.
         }
     }
+
+    
 }

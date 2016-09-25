@@ -32,6 +32,14 @@ public class Tile : MonoBehaviour {
 	
 	}
 
+    public int GetX()
+    {
+        return (int)index.x;
+    }
+    public int GetY()
+    {
+        return (int)index.y;
+    }
     public void RaiseTile(float inc)
     {
         //transform.position = new Vector3(transform.position.x, transform.position.y + height, transform.position.z);
